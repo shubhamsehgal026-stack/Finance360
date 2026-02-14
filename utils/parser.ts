@@ -60,33 +60,45 @@ export const parseTextToItems = (text: string) => {
         if (!row) return;
 
         let label = '';
-        let amount = 0;
+        let amount: number | null = null;
 
         if (row.includes('\t')) {
             const parts = row.split('\t');
             label = cleanText(parts[0]);
+            // Attempt to find the first valid number column
             for (let i = 1; i < parts.length; i++) {
-                const val = parseAmount(parts[i]);
-                if (val !== 0) {
-                    amount = val;
+                const raw = parts[i];
+                // Check if it looks like a number (ignoring currency/commas) to distinguish from text
+                const cleanedForCheck = String(raw).trim().replace(/[₹$€£\s,]/g, '');
+                // Allow '-' as a valid value (0)
+                if ((cleanedForCheck !== '' && !isNaN(parseFloat(cleanedForCheck))) || cleanedForCheck === '-') {
+                    amount = parseAmount(raw);
                     break;
                 }
             }
         } 
         else {
-            const numberMatch = row.match(/(.*?)\s+([-]?[\d,.]+[\d])$/);
-            if (numberMatch) {
-                label = cleanText(numberMatch[1]);
-                amount = parseAmount(numberMatch[2]);
+             // Handle cases where '-' represents 0 at the end of the line
+            const hyphenMatch = row.match(/(.*?)\s+-\s*$/);
+            
+            if (hyphenMatch) {
+                label = cleanText(hyphenMatch[1]);
+                amount = 0;
             } else {
-                label = cleanText(row);
+                const numberMatch = row.match(/(.*?)\s+([-]?[\d,.]+\.?\d*)$/);
+                if (numberMatch) {
+                    label = cleanText(numberMatch[1]);
+                    amount = parseAmount(numberMatch[2]);
+                } else {
+                    label = cleanText(row);
+                }
             }
         }
 
-        if (label && amount === 0 && !/total|surplus|deficit|grand|net/i.test(label)) {
+        if (label && amount === null && !/total|surplus|deficit|grand|net/i.test(label)) {
             currentCategory = label;
         } 
-        else if (label && amount !== 0) {
+        else if (label && amount !== null) {
             items.push({ label, value: amount, category: currentCategory });
         }
     });
@@ -111,9 +123,13 @@ const processAdmissionData = (school: SchoolBranch, wing: string, year: string, 
     rows.forEach(row => {
         if(!row || row.length < 2) return;
         const key = cleanText(row[0]);
-        const val = parseAmount(row[1]);
-        if (val > 0 && !/class|grade|total/i.test(key)) {
-             classMetrics.push({ grade: key, enrollment: val, capacity: Math.ceil(val * 1.2), revenue: 0, withdrawals: 0, admissions: 0 });
+        // Explicitly check for valid value presence
+        const rawVal = row[1];
+        if (rawVal !== undefined && rawVal !== null && rawVal !== '') {
+             const val = parseAmount(rawVal);
+             if (!/class|grade|total/i.test(key)) {
+                  classMetrics.push({ grade: key, enrollment: val, capacity: Math.ceil(val > 0 ? val * 1.2 : 40), revenue: 0, withdrawals: 0, admissions: 0 });
+             }
         }
     });
     const totalEnrollment = classMetrics.reduce((sum, c) => sum + c.enrollment, 0);
@@ -150,16 +166,20 @@ const processFinanceData = (school: SchoolBranch, wing: string, year: string, ro
     const heads: ExpenseItem[] = [];
     rows.forEach(row => {
         const k = cleanText(row[0]);
-        const v = parseAmount(row[1]);
-        if (v !== 0) {
-            if (/fee|receipt|income|revenue/i.test(k)) {
-                rev += v;
-                // Capture granular revenue items just like expenses
-                heads.push({ category: 'Revenue', subCategory: 'Uploaded Revenue', head: k, amount: v });
-            }
-            else {
-                exp += v;
-                heads.push({ category: 'Expenses', subCategory: 'General', head: k, amount: v });
+        const rawVal = row[1];
+        if (rawVal !== undefined && rawVal !== null && rawVal !== '') {
+            const v = parseAmount(rawVal);
+            
+            // Accept 0 values, provided they have a label
+            if (k) {
+                if (/fee|receipt|income|revenue/i.test(k)) {
+                    rev += v;
+                    heads.push({ category: 'Revenue', subCategory: 'Uploaded Revenue', head: k, amount: v });
+                }
+                else {
+                    exp += v;
+                    heads.push({ category: 'Expenses', subCategory: 'General', head: k, amount: v });
+                }
             }
         }
     });
@@ -191,7 +211,8 @@ export const mapFinanceData = (school: SchoolBranch, wing: string, year: string,
             revenueBreakdown: data.revBreakdown || { tuition: data.rev || 0, transport: 0, hostel: 0, activities: 0, miscellaneous: 0 },
             costBreakdown: { academicSalaries: data.salary || 0, nonTeachingSalaries: 0, adminOps: 0, infrastructure: 0, utilities: 0, transport: 0, marketing: 0, technology: 0, maintenance: 0, miscellaneous: Math.max(0, (data.exp || 0) - (data.salary || 0)) },
             detailedExpenses: data.heads || [],
-            feeRealization: 92, badDebts: 2, recurringRevenue: 0, oneTimeRevenue: 0, revenueGrowth: 0, expenseGrowth: 0, fixedCosts: 0, variableCosts: 0, breakEvenStudents: 0, dropoutRevenueImpact: 0, grossSurplus: 0, operatingSurplus: (data.rev || 0) - (data.exp || 0), netSurplus: data.surplus || 0, grossMargin: 0, operatingMargin: 0, netMargin: 0, profitPerStudent: 0, cashBalance: 0, monthlyBurnRate: (data.exp || 0)/12, monthsOfRunway: 12, receivablesDays: 0, assetValue: data.assets || 0, liabilitiesValue: data.liabilities || 0, returnOnAssets: 0, maintenanceToAssetRatio: 0
+            feeRealization: 92, badDebts: 2, recurringRevenue: 0, oneTimeRevenue: 0, revenueGrowth: 0, expenseGrowth: 0, fixedCosts: 0, variableCosts: 0, breakEvenStudents: 0,
+            dropoutRevenueImpact: 0, grossSurplus: 0, operatingSurplus: (data.rev || 0) - (data.exp || 0), netSurplus: data.surplus || 0, grossMargin: 0, operatingMargin: 0, netMargin: 0, profitPerStudent: 0, cashBalance: 0, monthlyBurnRate: (data.exp || 0)/12, monthsOfRunway: 12, receivablesDays: 0, assetValue: data.assets || 0, liabilitiesValue: data.liabilities || 0, returnOnAssets: 0, maintenanceToAssetRatio: 0
         }
     };
 };
@@ -220,10 +241,11 @@ export const parseStructuredFinanceData = async (
   tables.revenue.forEach(row => { if (row && row.length >= 2) rev += parseAmount(row[1]); });
   tables.expense.forEach(row => {
       if (row && row.length >= 2) {
-          const amt = parseAmount(row[1]);
-          if (amt !== 0) {
-              exp += amt;
-              heads.push({ category: 'Direct Expense', subCategory: 'General', head: cleanText(row[0]), amount: amt });
+          const rawVal = row[1];
+          if (rawVal !== undefined && rawVal !== null && rawVal !== '') {
+               const amt = parseAmount(rawVal);
+               exp += amt;
+               heads.push({ category: 'Direct Expense', subCategory: 'General', head: cleanText(row[0]), amount: amt });
           }
       }
   });

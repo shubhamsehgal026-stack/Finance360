@@ -81,6 +81,14 @@ const DataManagementPanel: React.FC<DataManagementPanelProps> = ({
     return stagingItems.reduce((acc, item) => acc + item.value, 0);
   }, [stagingItems]);
 
+  const categoryTotals = useMemo(() => {
+    return stagingItems.reduce((acc, item) => {
+        const cat = item.category;
+        acc[cat] = (acc[cat] || 0) + item.value;
+        return acc;
+    }, {} as Record<string, number>);
+  }, [stagingItems]);
+
   // Sync state with Context Props whenever the panel opens or context changes
   useEffect(() => {
     if (isOpen) {
@@ -277,6 +285,48 @@ const DataManagementPanel: React.FC<DataManagementPanelProps> = ({
                  detectedSub = "Contingency, Statutory & Other Expenses"; // Default fallback
              }
         }
+        else if (currentCategory === 'Assets') {
+             // Schedule A: Fixed Assets
+             if (l.match(/building|furniture|fitting|computer|library|book|motor|vehicle|cycle/)) { 
+                 detectedSub = "Schedule A: Fixed Assets"; 
+             }
+             // Schedule C: Loans & Advances
+             else if (l.match(/advance/)) { 
+                 detectedSub = "Schedule C: Loans & Advances"; 
+             }
+             // Schedule B: Current Assets
+             else if (l.match(/bank|cash|fdr|fee due|imprest|interest|t[\s\.]*d[\s\.]*s|darshan acad|security deposit/)) { 
+                 detectedSub = "Schedule B: Current Assets & Cash"; 
+             }
+             else {
+                 detectedSub = "Other Assets";
+             }
+        }
+        else if (currentCategory === 'Liabilities') {
+             // 1. Capital Fund (Corpus, Reserves, I&E Balance)
+             if (l.match(/capital|corpus|fund|reserve|surplus|deficit|income.*expenditure|excess of income/)) { 
+                 detectedSub = "Capital Fund"; 
+             }
+             // 2. Statutory & Expense Payables
+             else if (l.match(/payable|outstanding|provision|liability for|tds|pf|esi|gst|tax|audit fee|salary|stipend|expense/)) { 
+                 detectedSub = "Statutory & Expense Payables"; 
+             }
+             // 3. Trade Payables
+             else if (l.match(/creditor|vendor|supplier|bill/)) { 
+                 detectedSub = "Trade Payables"; 
+             }
+             // 4. Student Deposits & Advances
+             else if (l.match(/security|caution|refundable|student|advance fee|deposit/)) { 
+                 detectedSub = "Student Deposits & Advances"; 
+             }
+             // 5. Related Party Payables
+             else if (l.match(/darshan|society|trust|loan|inter|branch/)) { 
+                 detectedSub = "Related Party Payables"; 
+             }
+             else {
+                 detectedSub = "Other Current Liabilities";
+             }
+        }
 
         const finalSub = detectedSub || currentSubCategory.trim() || "Uncategorized Ledger";
 
@@ -468,7 +518,7 @@ const DataManagementPanel: React.FC<DataManagementPanelProps> = ({
                                     value={selectedSchool}
                                     onChange={(e) => setSelectedSchool(e.target.value as SchoolBranch)}
                                     disabled={contextSchool !== 'ALL'}
-                                    className={`w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-[11px] font-bold text-slate-900 focus:border-sky-500 outline-none transition-all ${contextSchool !== 'ALL' ? 'opacity-60 cursor-not-allowed bg-slate-100' : 'cursor-pointer'}`}
+                                    className={`w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-[11px] font-bold text-black focus:border-sky-500 outline-none transition-all ${contextSchool !== 'ALL' ? 'opacity-60 cursor-not-allowed bg-slate-100' : 'cursor-pointer'}`}
                                 >
                                     {DARSHAN_SCHOOLS.map(s => <option key={s} value={s}>{s}</option>)}
                                 </select>
@@ -482,7 +532,7 @@ const DataManagementPanel: React.FC<DataManagementPanelProps> = ({
                                             value={selectedWing}
                                             onChange={(e) => setSelectedWing(e.target.value)}
                                             disabled={contextSchool !== 'ALL' && contextWing !== 'ALL'}
-                                            className={`w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-[11px] font-bold text-slate-900 focus:border-sky-500 outline-none transition-all ${contextSchool !== 'ALL' && contextWing !== 'ALL' ? 'opacity-60 cursor-not-allowed bg-slate-100' : 'cursor-pointer'}`}
+                                            className={`w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-[11px] font-bold text-black focus:border-sky-500 outline-none transition-all ${contextSchool !== 'ALL' && contextWing !== 'ALL' ? 'opacity-60 cursor-not-allowed bg-slate-100' : 'cursor-pointer'}`}
                                         >
                                             {availableWings.map(w => <option key={w} value={w}>{w}</option>)}
                                         </select>
@@ -493,7 +543,7 @@ const DataManagementPanel: React.FC<DataManagementPanelProps> = ({
                                     <select 
                                         value={selectedYear}
                                         onChange={(e) => setSelectedYear(e.target.value)}
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-[11px] font-bold text-slate-900 focus:border-sky-500 outline-none transition-all cursor-pointer"
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-[11px] font-bold text-black focus:border-sky-500 outline-none transition-all cursor-pointer"
                                     >
                                         {AVAILABLE_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
                                     </select>
@@ -551,7 +601,7 @@ const DataManagementPanel: React.FC<DataManagementPanelProps> = ({
                           </div>
                       </div>
                       
-                      {/* ... (Sub Category and Paste Logic remains same) ... */}
+                      {/* Sub Category */}
                       <div className="space-y-4">
                           <div className="flex justify-between items-center">
                               <h3 className="text-[10px] font-black text-slate-900 uppercase tracking-widest flex items-center gap-2"><BoxSelect size={14} className="text-rose-600"/> 02. Sub-Category</h3>
@@ -562,7 +612,7 @@ const DataManagementPanel: React.FC<DataManagementPanelProps> = ({
                               value={currentSubCategory}
                               onChange={(e) => setCurrentSubCategory(e.target.value)}
                               placeholder="e.g. 'Repairs', 'Tuition'" 
-                              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-xs font-semibold focus:border-sky-500 outline-none"
+                              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-xs font-semibold text-black focus:border-sky-500 outline-none"
                           />
                       </div>
 
@@ -571,7 +621,7 @@ const DataManagementPanel: React.FC<DataManagementPanelProps> = ({
                            <textarea 
                                 value={rawText}
                                 onChange={(e) => setRawText(e.target.value)}
-                                className="w-full h-32 bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs font-mono focus:border-sky-500 outline-none resize-none"
+                                className="w-full h-32 bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs font-mono text-black focus:border-sky-500 outline-none resize-none"
                                 placeholder={`Paste rows from Excel here...\nFormat: [Description] [Amount]\nExample: "Salary Staff 450000"`}
                            />
                            <button 
@@ -598,12 +648,41 @@ const DataManagementPanel: React.FC<DataManagementPanelProps> = ({
                               <p className="text-[10px] text-slate-400 font-medium mt-0.5">Review and verify data before committing to the institutional repository.</p>
                           </div>
                           <div className="flex items-center gap-4">
-                              <div className="text-right">
-                                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Worksheet Total</p>
-                                  <p className="text-lg font-black text-slate-900 tabular-nums">
-                                      {worksheetTotal.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })}
-                                  </p>
-                              </div>
+                              {selectedType === 'Finance' ? (
+                                <div className="flex items-center gap-4 mr-2">
+                                    <div className="text-right">
+                                        <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Revenue</p>
+                                        <p className="text-sm font-black text-slate-900 tabular-nums">
+                                            {(categoryTotals['Revenue'] || 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })}
+                                        </p>
+                                    </div>
+                                    <div className="text-right border-l border-slate-100 pl-4">
+                                        <p className="text-[9px] font-black text-rose-600 uppercase tracking-widest">Expenses</p>
+                                        <p className="text-sm font-black text-slate-900 tabular-nums">
+                                            {(categoryTotals['Expenses'] || 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })}
+                                        </p>
+                                    </div>
+                                     <div className="text-right border-l border-slate-100 pl-4 hidden xl:block">
+                                        <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Assets</p>
+                                        <p className="text-sm font-black text-slate-900 tabular-nums">
+                                            {(categoryTotals['Assets'] || 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })}
+                                        </p>
+                                    </div>
+                                    <div className="text-right border-l border-slate-100 pl-4 hidden xl:block">
+                                        <p className="text-[9px] font-black text-amber-600 uppercase tracking-widest">Liabilities</p>
+                                        <p className="text-sm font-black text-slate-900 tabular-nums">
+                                            {(categoryTotals['Liabilities'] || 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })}
+                                        </p>
+                                    </div>
+                                </div>
+                              ) : (
+                                  <div className="text-right">
+                                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Worksheet Total</p>
+                                      <p className="text-lg font-black text-slate-900 tabular-nums">
+                                          {worksheetTotal.toLocaleString('en-IN')}
+                                      </p>
+                                  </div>
+                              )}
                               <div className="h-8 w-px bg-slate-200"></div>
                               <button onClick={() => setStagingItems([])} className="p-2 text-slate-400 hover:text-rose-600 transition-colors" title="Clear Worksheet">
                                   <RefreshCcw size={18} />
@@ -652,13 +731,13 @@ const DataManagementPanel: React.FC<DataManagementPanelProps> = ({
                                                                       type="text" 
                                                                       value={item.label}
                                                                       onChange={(e) => updateItem(item.id, 'label', e.target.value)}
-                                                                      className="flex-1 bg-transparent text-xs font-medium text-slate-700 focus:text-sky-600 outline-none truncate"
+                                                                      className="flex-1 bg-transparent text-xs font-medium text-black focus:text-sky-600 outline-none truncate"
                                                                   />
                                                                   <input 
                                                                       type="number" 
                                                                       value={item.value}
                                                                       onChange={(e) => updateItem(item.id, 'value', e.target.value)}
-                                                                      className="w-20 bg-transparent text-right text-xs font-mono text-slate-500 focus:text-slate-900 outline-none"
+                                                                      className="w-20 bg-transparent text-right text-xs font-mono text-black focus:text-black outline-none"
                                                                   />
                                                                   <button 
                                                                       onClick={() => deleteItem(item.id)}
